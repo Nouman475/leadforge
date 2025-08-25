@@ -1,0 +1,48 @@
+.ant-layout-sider-collapsed .ant-menu-item-icon {
+  font-size: 16px;
+}
+
+.ant-layout-sider-collapsed .ant-menu-item {
+  padding-left: 24px !important;
+}
+
+.dashboard-stats {
+  margin-bottom: 24px;
+}
+
+.lead-table .ant-table-thead > tr > th {
+  background-color: #fafafa;
+  font-weight: 600;
+}
+
+.status-new {
+  color: #1890ff;
+}
+
+.status-contacted {
+  color: #faad14;
+}
+
+.status-qualified {
+  color: #52c41a;
+}
+
+.status-proposal {
+  color: #722ed1;
+}
+
+.status-closed {
+  color: #f5222d;
+}
+
+.email-template-preview {
+  background-color: #f9f9f9;
+  border: 1px solid #d9d9d9;
+  border-radius: 6px;
+  padding: 16px;
+  margin-top: 16px;
+}
+
+.bulk-email-progress {
+  margin-top: 16px;
+}
