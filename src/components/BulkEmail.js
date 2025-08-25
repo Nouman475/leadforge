@@ -12,24 +12,23 @@ import {
   Progress,
   Modal,
   Input,
-  Form,
   Checkbox,
   Tag,
   Alert,
-  Divider
+  Divider,
+  Statistic
 } from 'antd';
 import { 
   MailOutlined, 
   SendOutlined, 
   EyeOutlined,
   CheckCircleOutlined,
-  ClockCircleOutlined,
   ExclamationCircleOutlined
 } from '@ant-design/icons';
 
 const { Option } = Select;
 const { TextArea } = Input;
-const { Title, Text } = Typography;
+const { Text } = Typography;
 
 const BulkEmail = ({ leads }) => {
   const [selectedLeads, setSelectedLeads] = useState([]);

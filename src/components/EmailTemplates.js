@@ -26,7 +26,7 @@ import {
 
 const { Option } = Select;
 const { TextArea } = Input;
-const { Title, Text } = Typography;
+const { Text } = Typography;
 
 const EmailTemplates = () => {
   const [selectedCategory, setSelectedCategory] = useState('introduction');
@@ -260,12 +260,6 @@ Best regards,
     message.success('Template deleted successfully');
   };
 
-  const useTemplate = (template) => {
-    setGeneratedTemplate(template.content);
-    setSelectedCategory(template.category);
-    setSelectedTone(template.tone);
-    message.success('Template loaded for editing');
-  };
 
   return (
     <div>
@@ -384,7 +378,12 @@ Best regards,
                 </Button>,
                 <Button
                   type="link"
-                  onClick={() => useTemplate(template)}
+                  onClick={() => {
+                    setGeneratedTemplate(template.content);
+                    setSelectedCategory(template.category);
+                    setSelectedTone(template.tone);
+                    message.success('Template loaded for editing');
+                  }}
                 >
                   Use
                 </Button>,

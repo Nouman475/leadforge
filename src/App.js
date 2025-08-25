@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Layout, Menu, Card, Statistic, Row, Col, Typography } from 'antd';
+import { Layout, Menu, Typography } from 'antd';
 import { 
-  UserOutlined, 
   MailOutlined, 
   FileTextOutlined, 
   DashboardOutlined,
@@ -91,7 +90,7 @@ function App() {
           color: 'white',
           fontWeight: 'bold'
         }}>
-          {collapsed ? 'LAT' : 'Lead Automation Tool'}
+          {collapsed ? 'LAT' : 'LeadForge'}
         </div>
         <Menu
           theme="dark"
@@ -115,7 +114,7 @@ function App() {
             height: '100%'
           }}>
             <Title level={3} style={{ margin: 0, color: '#1890ff' }}>
-              Lead Automation Tool
+              LeadForge
             </Title>
           </div>
         </Header>

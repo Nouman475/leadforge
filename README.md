@@ -1,4 +1,4 @@
-# Lead Automation Tool
+# LeadForge
 
 A comprehensive lead management automation tool built with React.js and Ant Design. This application helps you manage leads, generate AI-powered email templates, send bulk emails, and track your sales pipeline.
 
