@@ -8,7 +8,7 @@ const sequelize = new Sequelize({
   username: process.env.DB_USER || 'postgres',
   password: process.env.DB_PASSWORD || '',
   dialect: 'postgres',
-  logging: process.env.NODE_ENV === 'development' ? console.log : false,
+  logging: process.env.DB_LOGGING === 'true' ? console.log : false, // Enable with DB_LOGGING=true
   pool: {
     max: 10,
     min: 0,
