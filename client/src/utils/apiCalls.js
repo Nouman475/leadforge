@@ -36,6 +36,11 @@ export const campaignAPI = {
   getStats: () => axios.get(`${API_BASE_URL}/api/email-campaigns/stats`)
 };
 
+// Email History API functions
+export const emailHistoryAPI = {
+  getAll: (params = {}) => axios.get(`${API_BASE_URL}/api/email-campaigns/history`, { params })
+};
+
 // Dashboard API functions
 export const dashboardAPI = {
   getStats: () => axios.get(`${API_BASE_URL}/api/dashboard`),

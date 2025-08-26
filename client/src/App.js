@@ -4,12 +4,14 @@ import {
   MailOutlined, 
   FileTextOutlined, 
   DashboardOutlined,
-  ContactsOutlined 
+  ContactsOutlined,
+  HistoryOutlined
 } from '@ant-design/icons';
 import LeadManagement from './components/LeadManagement';
 import EmailTemplates from './components/EmailTemplates';
 import BulkEmail from './components/BulkEmail';
 import Dashboard from './components/Dashboard';
+import EmailHistory from './components/EmailHistory';
 import { leadAPI } from './utils/apiCalls';
 import './App.css';
 
@@ -61,6 +63,11 @@ function App() {
       icon: <MailOutlined />,
       label: 'Bulk Email',
     },
+    {
+      key: '5',
+      icon: <HistoryOutlined />,
+      label: 'Email History',
+    },
   ];
 
   const renderContent = () => {
@@ -73,6 +80,8 @@ function App() {
         return <EmailTemplates />;
       case '4':
         return <BulkEmail leads={leads} loading={loading} />;
+      case '5':
+        return <EmailHistory />;
       default:
         return <Dashboard leads={leads} loading={loading} />;
     }
