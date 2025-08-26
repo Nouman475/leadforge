@@ -1,13 +1,33 @@
-import React from 'react';
-import { Card, Statistic, Row, Col, Progress, List, Tag } from 'antd';
+import React, { useState, useEffect } from 'react';
+import { Card, Statistic, Row, Col, Progress, List, Tag, Spin } from 'antd';
 import { 
   UserOutlined, 
   MailOutlined, 
   CheckCircleOutlined, 
   ClockCircleOutlined 
 } from '@ant-design/icons';
+import { dashboardAPI } from '../utils/apiCalls';
 
-const Dashboard = ({ leads }) => {
+const Dashboard = ({ leads, loading }) => {
+  const [dashboardStats, setDashboardStats] = useState(null);
+  const [statsLoading, setStatsLoading] = useState(false);
+
+  useEffect(() => {
+    loadDashboardStats();
+  }, []);
+
+  const loadDashboardStats = async () => {
+    try {
+      setStatsLoading(true);
+      const response = await dashboardAPI.getStats();
+      setDashboardStats(response.data);
+    } catch (error) {
+      console.error('Error loading dashboard stats:', error);
+      // Fallback to local calculation if API fails
+    } finally {
+      setStatsLoading(false);
+    }
+  };
   const getStatusStats = () => {
     const stats = {
       total: leads.length,
@@ -44,7 +64,8 @@ const Dashboard = ({ leads }) => {
   };
 
   return (
-    <div>
+    <Spin spinning={loading || statsLoading}>
+      <div>
       <Row gutter={[16, 16]} className="dashboard-stats">
         <Col xs={24} sm={12} md={6}>
           <Card>
@@ -175,7 +196,8 @@ const Dashboard = ({ leads }) => {
           </Card>
         </Col>
       </Row>
-    </div>
+      </div>
+    </Spin>
   );
 };
 

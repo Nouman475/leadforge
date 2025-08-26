@@ -3,6 +3,98 @@ const { Op } = require('sequelize');
 const Joi = require('joi');
 const emailService = require('../services/emailService');
 
+// Helper function to send campaign emails
+async function sendCampaignEmails(campaignId, leads, subject, content) {
+  try {
+    const campaign = await EmailCampaign.findByPk(campaignId);
+    if (!campaign) return;
+
+    await campaign.update({ status: 'sending', sent_at: new Date() });
+
+    let emailsSent = 0;
+    let emailsFailed = 0;
+
+    for (const lead of leads) {
+      try {
+        // Personalize email content
+        const personalizedSubject = personalizeContent(subject, lead);
+        const personalizedContent = personalizeContent(content, lead);
+
+        // Create email history record
+        const emailHistory = await EmailHistory.create({
+          campaign_id: campaignId,
+          lead_id: lead.id,
+          recipient_email: lead.email,
+          recipient_name: lead.name,
+          subject: personalizedSubject,
+          content: personalizedContent,
+          status: 'pending'
+        });
+
+        // Send email
+        const result = await emailService.sendEmail({
+          to: lead.email,
+          subject: personalizedSubject,
+          html: personalizedContent,
+          text: personalizedContent.replace(/<[^>]*>/g, '') // Strip HTML for text version
+        });
+
+        if (result.success) {
+          await emailHistory.update({
+            status: 'sent',
+            sent_at: new Date(),
+            email_provider_id: result.messageId
+          });
+          emailsSent++;
+        } else {
+          await emailHistory.update({
+            status: 'failed',
+            error_message: result.error
+          });
+          emailsFailed++;
+        }
+
+        // Small delay between emails to avoid overwhelming SMTP server
+        await new Promise(resolve => setTimeout(resolve, 100));
+      } catch (error) {
+        console.error(`Failed to send email to ${lead.email}:`, error);
+        emailsFailed++;
+      }
+    }
+
+    // Update campaign with final stats
+    await campaign.update({
+      status: 'completed',
+      emails_sent: emailsSent,
+      emails_failed: emailsFailed,
+      completed_at: new Date()
+    });
+
+    console.log(`Campaign ${campaignId} completed: ${emailsSent} sent, ${emailsFailed} failed`);
+  } catch (error) {
+    console.error('Error in sendCampaignEmails:', error);
+    // Update campaign status to failed
+    try {
+      await EmailCampaign.update(
+        { status: 'failed', error_message: error.message },
+        { where: { id: campaignId } }
+      );
+    } catch (updateError) {
+      console.error('Failed to update campaign status:', updateError);
+    }
+  }
+}
+
+// Helper function to personalize content
+function personalizeContent(content, lead) {
+  return content
+    .replace(/\[name\]/g, lead.name || '')
+    .replace(/\[email\]/g, lead.email || '')
+    .replace(/\[company\]/g, lead.company || '')
+    .replace(/\[phone\]/g, lead.phone || '')
+    .replace(/\[status\]/g, lead.status || '');
+}
+
 // Validation schemas
 const campaignSchema = Joi.object({
   name: Joi.string().min(2).max(100).required(),
@@ -168,7 +260,9 @@ class EmailCampaignController {
       // If not scheduled, send immediately
       if (!campaignData.scheduled_at) {
         // Send emails in background
-        this.sendCampaignEmails(campaign.id, leads, campaignData.subject, campaignData.content);
+        setImmediate(async () => {
+          await sendCampaignEmails(campaign.id, leads, campaignData.subject, campaignData.content);
+        });
         
         res.status(201).json({
           success: true,
@@ -191,96 +285,35 @@ class EmailCampaignController {
     }
   }
 
-  // Send campaign emails (background process)
-  async sendCampaignEmails(campaignId, leads, subject, content) {
+  // Get campaign statistics
+  async getCampaignStats(req, res) {
     try {
-      const campaign = await EmailCampaign.findByPk(campaignId);
-      if (!campaign) return;
-
-      await campaign.update({ status: 'sending', sent_at: new Date() });
-
-      let emailsSent = 0;
-      let emailsFailed = 0;
-
-      for (const lead of leads) {
-        try {
-          // Personalize email content
-          const personalizedSubject = this.personalizeContent(subject, lead);
-          const personalizedContent = this.personalizeContent(content, lead);
-
-          // Create email history record
-          const emailHistory = await EmailHistory.create({
-            campaign_id: campaignId,
-            lead_id: lead.id,
-            recipient_email: lead.email,
-            recipient_name: lead.name,
-            subject: personalizedSubject,
-            content: personalizedContent,
-            status: 'pending'
-          });
-
-          // Send email
-          const result = await emailService.sendEmail({
-            to: lead.email,
-            subject: personalizedSubject,
-            html: personalizedContent,
-            text: personalizedContent.replace(/<[^>]*>/g, '') // Strip HTML for text version
-          });
-
-          if (result.success) {
-            await emailHistory.update({
-              status: 'sent',
-              sent_at: new Date(),
-              email_provider_id: result.messageId
-            });
-            emailsSent++;
-          } else {
-            await emailHistory.update({
-              status: 'failed',
-              error_message: result.error
-            });
-            emailsFailed++;
-          }
-
-          // Update lead's last_contacted
-          await lead.update({ last_contacted: new Date() });
-
-          // Small delay to avoid overwhelming email service
-          await new Promise(resolve => setTimeout(resolve, 100));
-
-        } catch (emailError) {
-          console.error(`Failed to send email to ${lead.email}:`, emailError);
-          emailsFailed++;
+      const totalCampaigns = await EmailCampaign.count();
+      const activeCampaigns = await EmailCampaign.count({ where: { status: 'sending' } });
+      const completedCampaigns = await EmailCampaign.count({ where: { status: 'completed' } });
+      const scheduledCampaigns = await EmailCampaign.count({ where: { status: 'scheduled' } });
+      
+      const totalEmailsSent = await EmailHistory.count({ where: { status: 'sent' } });
+      const totalEmailsFailed = await EmailHistory.count({ where: { status: 'failed' } });
+      
+      res.json({
+        success: true,
+        data: {
+          totalCampaigns,
+          activeCampaigns,
+          completedCampaigns,
+          scheduledCampaigns,
+          totalEmailsSent,
+          totalEmailsFailed
         }
-      }
-
-      // Update campaign with final results
-      await campaign.update({
-        status: 'completed',
-        emails_sent: emailsSent,
-        emails_failed: emailsFailed
       });
-
     } catch (error) {
-      console.error('Campaign sending error:', error);
-      await EmailCampaign.update(
-        { status: 'failed' },
-        { where: { id: campaignId } }
-      );
+      res.status(500).json({
+        success: false,
+        error: 'Failed to fetch campaign statistics',
+        message: error.message
+      });
     }
-  }
-
-  // Personalize email content with lead data
-  personalizeContent(content, lead) {
-    return content
-      .replace(/\[Name\]/g, lead.name || '')
-      .replace(/\[Company Name\]/g, lead.company || 'your company')
-      .replace(/\[Email\]/g, lead.email || '')
-      .replace(/\[Phone\]/g, lead.phone || '')
-      .replace(/\[Your Name\]/g, process.env.SENDER_NAME || 'Your Name')
-      .replace(/\[Your Company\]/g, process.env.COMPANY_NAME || 'Your Company')
-      .replace(/\[Your Title\]/g, process.env.SENDER_TITLE || 'Your Title')
-      .replace(/\[Your Contact Information\]/g, process.env.CONTACT_INFO || 'Your Contact Info');
   }
 
   // Update campaign

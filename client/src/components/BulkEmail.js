@@ -16,7 +16,8 @@ import {
   Tag,
   Alert,
   Divider,
-  Statistic
+  Statistic,
+  Spin
 } from 'antd';
 import { 
   MailOutlined, 
@@ -25,12 +26,13 @@ import {
   CheckCircleOutlined,
   ExclamationCircleOutlined
 } from '@ant-design/icons';
+import { templateAPI, campaignAPI } from '../utils/apiCalls';
 
 const { Option } = Select;
 const { TextArea } = Input;
 const { Text } = Typography;
 
-const BulkEmail = ({ leads }) => {
+const BulkEmail = ({ leads, loading }) => {
   const [selectedLeads, setSelectedLeads] = useState([]);
   const [selectedTemplate, setSelectedTemplate] = useState('');
   const [emailContent, setEmailContent] = useState('');
@@ -42,24 +44,36 @@ const BulkEmail = ({ leads }) => {
   const [previewLead, setPreviewLead] = useState(null);
   const [emailHistory, setEmailHistory] = useState([]);
   const [filterStatus, setFilterStatus] = useState('all');
+  const [templatesLoading, setTemplatesLoading] = useState(false);
 
-  // Load saved templates and email history
+  // Load saved templates and email history from API
   useEffect(() => {
-    const templates = localStorage.getItem('emailTemplates');
-    if (templates) {
-      setSavedTemplates(JSON.parse(templates));
-    }
-
-    const history = localStorage.getItem('emailHistory');
-    if (history) {
-      setEmailHistory(JSON.parse(history));
-    }
+    loadTemplates();
+    loadEmailHistory();
   }, []);
 
-  // Save email history
-  useEffect(() => {
-    localStorage.setItem('emailHistory', JSON.stringify(emailHistory));
-  }, [emailHistory]);
+  const loadTemplates = async () => {
+    try {
+      setTemplatesLoading(true);
+      const response = await templateAPI.getAll();
+      setSavedTemplates(response.data.data.templates || []);
+    } catch (error) {
+      console.error('Error loading templates:', error);
+      message.error('Failed to load templates');
+    } finally {
+      setTemplatesLoading(false);
+    }
+  };
+
+  const loadEmailHistory = async () => {
+    try {
+      const response = await campaignAPI.getAll();
+      setEmailHistory(response.data.campaigns || []);
+    } catch (error) {
+      console.error('Error loading email history:', error);
+      // Don't show error message as this is not critical
+    }
+  };
 
   const statusOptions = [
     { value: 'all', label: 'All Leads' },
@@ -189,34 +203,35 @@ const BulkEmail = ({ leads }) => {
     setSendProgress(0);
 
     const selectedLeadData = leads.filter(lead => selectedLeads.includes(lead.id));
-    const totalEmails = selectedLeadData.length;
-
-    // Simulate sending emails with progress
-    for (let i = 0; i < totalEmails; i++) {
-      const lead = selectedLeadData[i];
-      
-      // Simulate API call delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Add to email history
-      const emailRecord = {
-        id: Date.now() + i,
-        leadId: lead.id,
-        leadName: lead.name,
-        leadEmail: lead.email,
-        subject: personalizeEmail(emailSubject, lead),
-        content: personalizeEmail(emailContent, lead),
-        sentAt: new Date().toISOString(),
-        status: Math.random() > 0.1 ? 'sent' : 'failed' // 90% success rate simulation
+    
+    try {
+      // Create campaign with selected leads
+      const campaignData = {
+        name: `Bulk Campaign - ${new Date().toLocaleDateString()}`,
+        subject: emailSubject,
+        content: emailContent,
+        lead_ids: selectedLeads
       };
 
-      setEmailHistory(prev => [emailRecord, ...prev]);
-      setSendProgress(((i + 1) / totalEmails) * 100);
-    }
+      const response = await campaignAPI.create(campaignData);
+      
+      // Simulate progress for UX
+      const totalEmails = selectedLeadData.length;
+      for (let i = 0; i < totalEmails; i++) {
+        await new Promise(resolve => setTimeout(resolve, 500));
+        setSendProgress(((i + 1) / totalEmails) * 100);
+      }
 
-    setIsSending(false);
-    message.success(`Successfully sent ${totalEmails} emails!`);
-    setSelectedLeads([]);
+      message.success(`Successfully sent ${totalEmails} emails!`);
+      setSelectedLeads([]);
+      loadEmailHistory(); // Reload email history
+    } catch (error) {
+      console.error('Error sending bulk email:', error);
+      message.error('Failed to send bulk email');
+    } finally {
+      setIsSending(false);
+      setSendProgress(0);
+    }
   };
 
   const getEmailStats = () => {
@@ -369,13 +384,15 @@ const BulkEmail = ({ leads }) => {
           </Space>
         </div>
 
-        <Table
-          columns={columns}
-          dataSource={filteredLeads}
-          rowKey="id"
-          pagination={{ pageSize: 10 }}
-          size="small"
-        />
+        <Spin spinning={loading}>
+          <Table
+            columns={columns}
+            dataSource={filteredLeads}
+            rowKey="id"
+            pagination={{ pageSize: 10 }}
+            size="small"
+          />
+        </Spin>
       </Card>
 
       <Modal

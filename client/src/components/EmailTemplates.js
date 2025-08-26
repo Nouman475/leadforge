@@ -13,7 +13,8 @@ import {
   Tag,
   Modal,
   Form,
-  List
+  List,
+  Spin
 } from 'antd';
 import { 
   RobotOutlined, 
@@ -23,6 +24,7 @@ import {
   EditOutlined,
   DeleteOutlined
 } from '@ant-design/icons';
+import { templateAPI } from '../utils/apiCalls';
 
 const { Option } = Select;
 const { TextArea } = Input;
@@ -36,20 +38,33 @@ const EmailTemplates = () => {
   const [savedTemplates, setSavedTemplates] = useState([]);
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState(null);
+  const [loading, setLoading] = useState(false);
   const [form] = Form.useForm();
 
-  // Load saved templates from localStorage
+  // Load saved templates from API
   useEffect(() => {
-    const saved = localStorage.getItem('emailTemplates');
-    if (saved) {
-      setSavedTemplates(JSON.parse(saved));
-    }
+    loadTemplates();
   }, []);
 
-  // Save templates to localStorage
-  useEffect(() => {
-    localStorage.setItem('emailTemplates', JSON.stringify(savedTemplates));
-  }, [savedTemplates]);
+  const loadTemplates = async () => {
+    try {
+      setLoading(true);
+      console.log('Loading templates...');
+      const response = await templateAPI.getAll();
+      console.log('Full API response:', response);
+      console.log('Response data:', response.data);
+      console.log('Response data.data:', response.data.data);
+      console.log('Response data.data.templates:', response.data.data?.templates);
+      const templates = response.data.data?.templates || [];
+      console.log('Extracted templates:', templates);
+      setSavedTemplates(templates);
+    } catch (error) {
+      console.error('Error loading templates:', error);
+      message.error(`Failed to load templates: ${error.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const categories = [
     { value: 'introduction', label: 'Introduction/Cold Outreach' },
@@ -227,25 +242,21 @@ Best regards,
   const handleSaveTemplate = async () => {
     try {
       const values = await form.validateFields();
-      const newTemplate = {
-        id: editingTemplate?.id || Date.now(),
-        ...values,
-        createdAt: editingTemplate?.createdAt || new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      };
-
+      
       if (editingTemplate) {
-        setSavedTemplates(savedTemplates.map(t => t.id === editingTemplate.id ? newTemplate : t));
+        await templateAPI.update(editingTemplate.id, values);
         message.success('Template updated successfully');
       } else {
-        setSavedTemplates([...savedTemplates, newTemplate]);
+        await templateAPI.create(values);
         message.success('Template saved successfully');
       }
 
       setIsModalVisible(false);
       form.resetFields();
+      loadTemplates(); // Reload templates from API
     } catch (error) {
-      console.error('Validation failed:', error);
+      console.error('Error saving template:', error);
+      message.error('Failed to save template');
     }
   };
 
@@ -255,9 +266,15 @@ Best regards,
     setIsModalVisible(true);
   };
 
-  const deleteTemplate = (id) => {
-    setSavedTemplates(savedTemplates.filter(t => t.id !== id));
-    message.success('Template deleted successfully');
+  const deleteTemplate = async (id) => {
+    try {
+      await templateAPI.delete(id);
+      message.success('Template deleted successfully');
+      loadTemplates(); // Reload templates from API
+    } catch (error) {
+      console.error('Error deleting template:', error);
+      message.error('Failed to delete template');
+    }
   };
 
 
@@ -364,9 +381,10 @@ Best regards,
       <Divider />
 
       <Card title="Saved Templates" extra={<PlusOutlined />}>
-        <List
-          dataSource={savedTemplates}
-          renderItem={template => (
+        <Spin spinning={loading}>
+          <List
+            dataSource={savedTemplates}
+            renderItem={template => (
             <List.Item
               actions={[
                 <Button
@@ -404,15 +422,16 @@ Best regards,
                     <Tag color="blue">{template.category}</Tag>
                     <Tag color="green">{template.tone}</Tag>
                     <Text type="secondary">
-                      Created: {new Date(template.createdAt).toLocaleDateString()}
+                      Created: {new Date(template.created_at).toLocaleDateString()}
                     </Text>
                   </div>
                 }
               />
             </List.Item>
-          )}
-          locale={{ emptyText: 'No saved templates yet. Generate and save some templates!' }}
-        />
+            )}
+            locale={{ emptyText: 'No saved templates yet. Generate and save some templates!' }}
+          />
+        </Spin>
       </Card>
 
       <Modal

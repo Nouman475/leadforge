@@ -55,6 +55,7 @@ const EmailTemplate = sequelize.define('EmailTemplate', {
   }
 }, {
   tableName: 'email_templates',
+  timestamps: false,
   indexes: [
     {
       fields: ['category']

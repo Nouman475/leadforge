@@ -41,7 +41,7 @@ class EmailTemplateController {
 
       // Filter by active status
       if (is_active !== 'all') {
-        whereClause.is_active = is_active === 'true';
+        whereClause.is_active = is_active === 'true' || is_active === true;
       }
 
       // Filter by category
@@ -63,12 +63,17 @@ class EmailTemplateController {
         ];
       }
 
+      console.log('EmailTemplate query whereClause:', whereClause);
+      
       const { count, rows } = await EmailTemplate.findAndCountAll({
         where: whereClause,
         limit: parseInt(limit),
         offset: offset,
         order: [[sortBy, sortOrder.toUpperCase()]]
       });
+
+      console.log('EmailTemplate query results - count:', count, 'rows:', rows.length);
+      console.log('First template:', rows[0] ? rows[0].toJSON() : 'none');
 
       res.json({
         success: true,
