@@ -41,7 +41,7 @@ class EmailTemplateController {
 
       // Filter by active status
       if (is_active !== 'all') {
-        whereClause.is_active = is_active === 'true';
+        whereClause.is_active = is_active === 'true' || is_active === true;
       }
 
       // Filter by category
@@ -62,7 +62,7 @@ class EmailTemplateController {
           { subject: { [Op.iLike]: `%${search}%` } }
         ];
       }
-
+      
       const { count, rows } = await EmailTemplate.findAndCountAll({
         where: whereClause,
         limit: parseInt(limit),

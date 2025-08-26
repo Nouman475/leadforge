@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Layout, Menu, Typography } from 'antd';
+import { Layout, Menu, Typography, message } from 'antd';
 import { 
   MailOutlined, 
   FileTextOutlined, 
@@ -10,6 +10,7 @@ import LeadManagement from './components/LeadManagement';
 import EmailTemplates from './components/EmailTemplates';
 import BulkEmail from './components/BulkEmail';
 import Dashboard from './components/Dashboard';
+import { leadAPI } from './utils/apiCalls';
 import './App.css';
 
 const { Header, Content, Sider } = Layout;
@@ -19,19 +20,25 @@ function App() {
   const [selectedKey, setSelectedKey] = useState('1');
   const [leads, setLeads] = useState([]);
   const [collapsed, setCollapsed] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-  // Load leads from localStorage on component mount
+  // Load leads from API on component mount
   useEffect(() => {
-    const savedLeads = localStorage.getItem('leads');
-    if (savedLeads) {
-      setLeads(JSON.parse(savedLeads));
-    }
+    loadLeads();
   }, []);
 
-  // Save leads to localStorage whenever leads change
-  useEffect(() => {
-    localStorage.setItem('leads', JSON.stringify(leads));
-  }, [leads]);
+  const loadLeads = async () => {
+    try {
+      setLoading(true);
+      const response = await leadAPI.getAll();
+      setLeads(response.data.data.leads || []);
+    } catch (error) {
+      console.error('Error loading leads:', error);
+      message.error('Failed to load leads. Please check if the server is running.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const menuItems = [
     {
@@ -59,15 +66,15 @@ function App() {
   const renderContent = () => {
     switch (selectedKey) {
       case '1':
-        return <Dashboard leads={leads} />;
+        return <Dashboard leads={leads} loading={loading} />;
       case '2':
-        return <LeadManagement leads={leads} setLeads={setLeads} />;
+        return <LeadManagement leads={leads} setLeads={setLeads} onLeadsChange={loadLeads} loading={loading} />;
       case '3':
         return <EmailTemplates />;
       case '4':
-        return <BulkEmail leads={leads} />;
+        return <BulkEmail leads={leads} loading={loading} />;
       default:
-        return <Dashboard leads={leads} />;
+        return <Dashboard leads={leads} loading={loading} />;
     }
   };
 

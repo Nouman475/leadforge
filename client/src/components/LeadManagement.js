@@ -12,7 +12,8 @@ import {
   message,
   Row,
   Col,
-  Card
+  Card,
+  Spin
 } from 'antd';
 import { 
   PlusOutlined, 
@@ -23,12 +24,12 @@ import {
 } from '@ant-design/icons';
 import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver';
-import { v4 as uuidv4 } from 'uuid';
+import { leadAPI } from '../utils/apiCalls';
 
 const { Option } = Select;
 const { TextArea } = Input;
 
-const LeadManagement = ({ leads, setLeads }) => {
+const LeadManagement = ({ leads, setLeads, onLeadsChange, loading }) => {
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [editingLead, setEditingLead] = useState(null);
   const [form] = Form.useForm();
@@ -124,9 +125,15 @@ const LeadManagement = ({ leads, setLeads }) => {
     setIsModalVisible(true);
   };
 
-  const handleDelete = (id) => {
-    setLeads(leads.filter(lead => lead.id !== id));
-    message.success('Lead deleted successfully');
+  const handleDelete = async (id) => {
+    try {
+      await leadAPI.delete(id);
+      message.success('Lead deleted successfully');
+      onLeadsChange(); // Reload leads from API
+    } catch (error) {
+      console.error('Error deleting lead:', error);
+      message.error('Failed to delete lead');
+    }
   };
 
   const handleSubmit = async () => {
@@ -135,28 +142,20 @@ const LeadManagement = ({ leads, setLeads }) => {
       
       if (editingLead) {
         // Update existing lead
-        setLeads(leads.map(lead => 
-          lead.id === editingLead.id 
-            ? { ...lead, ...values, updatedAt: new Date().toISOString() }
-            : lead
-        ));
+        await leadAPI.update(editingLead.id, values);
         message.success('Lead updated successfully');
       } else {
         // Add new lead
-        const newLead = {
-          id: uuidv4(),
-          ...values,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
-        };
-        setLeads([...leads, newLead]);
+        await leadAPI.create(values);
         message.success('Lead added successfully');
       }
       
       setIsModalVisible(false);
       form.resetFields();
+      onLeadsChange(); // Reload leads from API
     } catch (error) {
-      console.error('Validation failed:', error);
+      console.error('Error saving lead:', error);
+      message.error('Failed to save lead');
     }
   };
 
@@ -238,18 +237,20 @@ const LeadManagement = ({ leads, setLeads }) => {
           </Col>
         </Row>
 
-        <Table
-          columns={columns}
-          dataSource={leads}
-          rowKey="id"
-          pagination={{
-            pageSize: 10,
-            showSizeChanger: true,
-            showQuickJumper: true,
-            showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} leads`,
-          }}
-          className="lead-table"
-        />
+        <Spin spinning={loading}>
+          <Table
+            columns={columns}
+            dataSource={leads}
+            rowKey="id"
+            pagination={{
+              pageSize: 10,
+              showSizeChanger: true,
+              showQuickJumper: true,
+              showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} leads`,
+            }}
+            className="lead-table"
+          />
+        </Spin>
       </Card>
 
       <Modal

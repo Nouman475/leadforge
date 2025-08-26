@@ -8,6 +8,15 @@ router.get('/', emailCampaignController.getAllCampaigns);
 // GET /api/email-campaigns/stats - Get campaign statistics
 router.get('/stats', emailCampaignController.getCampaignStats);
 
+// GET /api/email-campaigns/history - Get all email history
+router.get('/history', emailCampaignController.getAllEmailHistory);
+
+// GET /api/email-campaigns/track/open/:emailHistoryId - Track email opens (pixel)
+router.get('/track/open/:emailHistoryId', emailCampaignController.trackEmailOpen);
+
+// GET /api/email-campaigns/track/click/:emailHistoryId - Track email clicks
+router.get('/track/click/:emailHistoryId', emailCampaignController.trackEmailClick);
+
 // GET /api/email-campaigns/:id - Get single campaign by ID
 router.get('/:id', emailCampaignController.getCampaignById);
 
