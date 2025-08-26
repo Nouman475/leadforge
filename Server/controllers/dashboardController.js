@@ -3,26 +3,46 @@ const { Op } = require('sequelize');
 const moment = require('moment');
 
 class DashboardController {
+  constructor() {
+    // Bind all methods to preserve 'this' context
+    this.getDashboardStats = this.getDashboardStats.bind(this);
+    this.getLeadFunnel = this.getLeadFunnel.bind(this);
+    this.getEmailPerformanceOverTime = this.getEmailPerformanceOverTime.bind(this);
+    this.getTemplateUsage = this.getTemplateUsage.bind(this);
+  }
+
   // Get comprehensive dashboard statistics
   async getDashboardStats(req, res) {
     try {
+      console.log('📊 Dashboard stats requested');
       const { period = '30' } = req.query; // days
       const startDate = moment().subtract(parseInt(period), 'days').toDate();
+      console.log('📅 Start date:', startDate);
 
       // Lead statistics
+      console.log('👥 Getting lead stats...');
       const leadStats = await this.getLeadStats(startDate);
+      console.log('✅ Lead stats:', leadStats);
       
       // Email campaign statistics
+      console.log('🚀 Getting campaign stats...');
       const campaignStats = await this.getCampaignStats(startDate);
+      console.log('✅ Campaign stats:', campaignStats);
       
       // Email performance statistics
+      console.log('📧 Getting email stats...');
       const emailStats = await this.getEmailStats(startDate);
+      console.log('✅ Email stats:', emailStats);
       
       // Recent activity
+      console.log('📋 Getting recent activity...');
       const recentActivity = await this.getRecentActivity();
+      console.log('✅ Recent activity loaded');
 
       // Growth metrics
+      console.log('📈 Getting growth metrics...');
       const growthMetrics = await this.getGrowthMetrics(startDate);
+      console.log('✅ Growth metrics:', growthMetrics);
 
       res.json({
         success: true,
@@ -36,10 +56,13 @@ class DashboardController {
         }
       });
     } catch (error) {
+      console.error('❌ Dashboard error:', error);
+      console.error('Stack trace:', error.stack);
       res.status(500).json({
         success: false,
         error: 'Failed to fetch dashboard statistics',
-        message: error.message
+        message: error.message,
+        stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
       });
     }
   }
@@ -117,31 +140,35 @@ class DashboardController {
 
   // Get email performance statistics
   async getEmailStats(startDate) {
+    // Get all email counts without date filter first to show total stats
     const totalSent = await EmailHistory.count({
+      where: { status: 'sent' }
+    });
+
+    const totalFailed = await EmailHistory.count({
+      where: { status: 'failed' }
+    });
+
+    const totalOpened = await EmailHistory.count({
+      where: { status: 'opened' }
+    });
+
+    const totalClicked = await EmailHistory.count({
+      where: { status: 'clicked' }
+    });
+
+    // Also get recent stats for the period
+    const recentSent = await EmailHistory.count({
       where: { 
         status: 'sent',
         sent_at: { [Op.gte]: startDate }
       }
     });
 
-    const totalFailed = await EmailHistory.count({
+    const recentFailed = await EmailHistory.count({
       where: { 
         status: 'failed',
         created_at: { [Op.gte]: startDate }
-      }
-    });
-
-    const totalOpened = await EmailHistory.count({
-      where: { 
-        status: 'opened',
-        opened_at: { [Op.gte]: startDate }
-      }
-    });
-
-    const totalClicked = await EmailHistory.count({
-      where: { 
-        status: 'clicked',
-        clicked_at: { [Op.gte]: startDate }
       }
     });
 
@@ -154,6 +181,8 @@ class DashboardController {
       totalFailed,
       totalOpened,
       totalClicked,
+      recentSent,
+      recentFailed,
       openRate: parseFloat(openRate),
       clickRate: parseFloat(clickRate),
       deliveryRate: parseFloat(deliveryRate)

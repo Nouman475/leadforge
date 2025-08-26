@@ -49,14 +49,8 @@ const EmailTemplates = () => {
   const loadTemplates = async () => {
     try {
       setLoading(true);
-      console.log('Loading templates...');
       const response = await templateAPI.getAll();
-      console.log('Full API response:', response);
-      console.log('Response data:', response.data);
-      console.log('Response data.data:', response.data.data);
-      console.log('Response data.data.templates:', response.data.data?.templates);
       const templates = response.data.data?.templates || [];
-      console.log('Extracted templates:', templates);
       setSavedTemplates(templates);
     } catch (error) {
       console.error('Error loading templates:', error);

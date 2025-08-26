@@ -62,8 +62,6 @@ class EmailTemplateController {
           { subject: { [Op.iLike]: `%${search}%` } }
         ];
       }
-
-      console.log('EmailTemplate query whereClause:', whereClause);
       
       const { count, rows } = await EmailTemplate.findAndCountAll({
         where: whereClause,
@@ -71,9 +69,6 @@ class EmailTemplateController {
         offset: offset,
         order: [[sortBy, sortOrder.toUpperCase()]]
       });
-
-      console.log('EmailTemplate query results - count:', count, 'rows:', rows.length);
-      console.log('First template:', rows[0] ? rows[0].toJSON() : 'none');
 
       res.json({
         success: true,
