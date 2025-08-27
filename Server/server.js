@@ -13,6 +13,7 @@ const leadRoutes = require('./routes/leadRoutes');
 const emailTemplateRoutes = require('./routes/emailTemplateRoutes');
 const emailCampaignRoutes = require('./routes/emailCampaignRoutes');
 const dashboardRoutes = require('./routes/dashboardRoutes');
+const webhookRoutes = require('./routes/webhookRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -52,6 +53,7 @@ app.use('/api/leads', leadRoutes);
 app.use('/api/email-templates', emailTemplateRoutes);
 app.use('/api/email-campaigns', emailCampaignRoutes);
 app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/webhooks', webhookRoutes);
 
 // 404 handler
 app.use('*', (req, res) => {

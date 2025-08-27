@@ -74,6 +74,29 @@ const EmailHistory = sequelize.define('EmailHistory', {
     type: DataTypes.STRING,
     allowNull: true
   },
+  retry_count: {
+    type: DataTypes.INTEGER,
+    defaultValue: 0,
+    allowNull: false
+  },
+  message_uuid: {
+    type: DataTypes.UUID,
+    allowNull: true,
+    unique: true
+  },
+  provider_response: {
+    type: DataTypes.TEXT,
+    allowNull: true
+  },
+  bounce_reason: {
+    type: DataTypes.STRING,
+    allowNull: true
+  },
+  unsubscribe_token: {
+    type: DataTypes.STRING,
+    allowNull: true,
+    unique: true
+  },
   created_at: {
     type: DataTypes.DATE,
     defaultValue: DataTypes.NOW
@@ -99,8 +122,17 @@ const EmailHistory = sequelize.define('EmailHistory', {
     },
     {
       fields: ['recipient_email']
+    },
+    {
+      fields: ['message_uuid']
+    },
+    {
+      fields: ['email_provider_id']
+    },
+    {
+      fields: ['unsubscribe_token']
     }
   ]
 });
 
-module.exports = EmailHistory;
+module.exports = { EmailHistory };

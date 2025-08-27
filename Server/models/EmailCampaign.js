@@ -85,4 +85,4 @@ const EmailCampaign = sequelize.define('EmailCampaign', {
   ]
 });
 
-module.exports = EmailCampaign;
+module.exports = { EmailCampaign };

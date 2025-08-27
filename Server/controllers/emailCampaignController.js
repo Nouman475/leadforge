@@ -1,15 +1,24 @@
+const { Lead } = require("../models/Lead");
+const { EmailTemplate } = require("../models/EmailTemplate");
+const { EmailCampaign } = require("../models/EmailCampaign");
+const { EmailHistory } = require("../models/EmailHistory");
+const { emailService } = require("../config/email");
 const {
-  EmailCampaign,
-  EmailHistory,
-  EmailTemplate,
-  Lead,
-} = require("../models");
+  wrapContentInTemplate,
+  generateEmailContent,
+  generateEmailSubject,
+} = require("../utils/emailTemplates");
 const { Op } = require("sequelize");
 const Joi = require("joi");
-const emailService = require("../services/emailService");
+const { v4: uuidv4 } = require("uuid");
 
-// Helper function to send campaign emails
-async function sendCampaignEmails(campaignId, leads, subject, content) {
+// Helper function to send campaign emails with automatic content generation
+async function sendCampaignEmails(
+  campaignId,
+  leads,
+  category = "introduction",
+  tone = "professional"
+) {
   try {
     const campaign = await EmailCampaign.findByPk(campaignId);
     if (!campaign) return;
@@ -21,9 +30,13 @@ async function sendCampaignEmails(campaignId, leads, subject, content) {
 
     for (const lead of leads) {
       try {
-        // Personalize email content
-        const personalizedSubject = personalizeContent(subject, lead);
-        const personalizedContent = personalizeContent(content, lead);
+        // Generate automatic subject and content based on category and tone
+        const personalizedSubject = generateEmailSubject(category, tone, lead);
+        const personalizedContent = generateEmailContent(category, tone, lead);
+
+        // Generate unique identifiers for idempotency
+        const messageUuid = uuidv4();
+        const unsubscribeToken = uuidv4();
 
         // Create email history record
         const emailHistory = await EmailHistory.create({
@@ -34,15 +47,47 @@ async function sendCampaignEmails(campaignId, leads, subject, content) {
           subject: personalizedSubject,
           content: personalizedContent,
           status: "pending",
+          message_uuid: messageUuid,
+          unsubscribe_token: unsubscribeToken,
+          retry_count: 0,
         });
 
-        // Add tracking pixel to email content
+        // User info for signature (you can make this configurable via environment variables)
+        const userInfo = {
+          name: process.env.USER_NAME || "Muhammad Nouman",
+          title: process.env.USER_TITLE || "MERN Stack Developer",
+          email:
+            process.env.FROM_EMAIL ||
+            process.env.SMTP_USER ||
+            "mnoumankhalid195@gmail.com",
+          phone: process.env.USER_PHONE || "+92 3028954240",
+          company: process.env.USER_COMPANY || "",
+          website: process.env.USER_WEBSITE || "noumanthedev.netlify.app",
+        };
+
+        // Wrap content in professional HTML template with dynamic category, tone, and user info
+        const htmlContent = wrapContentInTemplate(
+          personalizedContent,
+          category,
+          tone,
+          userInfo
+        );
+
+        // Add tracking pixel and unsubscribe link to email content
         const trackingPixelUrl = `${
           process.env.BASE_URL || "http://localhost:5000"
         }/api/email-campaigns/track/open/${emailHistory.id}`;
-        const contentWithTracking =
-          personalizedContent +
-          `<img src="${trackingPixelUrl}" width="1" height="1" style="display:none;" />`;
+        const unsubscribeUrl = `${
+          process.env.BASE_URL || "http://localhost:5000"
+        }/api/webhooks/unsubscribe/${unsubscribeToken}`;
+
+        // Replace template placeholders with actual URLs
+        const contentWithTracking = htmlContent
+          .replace(/\{\{unsubscribe_url\}\}/g, unsubscribeUrl)
+          .replace(
+            /\{\{tracking_pixel\}\}/g,
+            `<img src="${trackingPixelUrl}" width="1" height="1" style="display:none;" />`
+          );
 
         // Send email
         const result = await emailService.sendEmail({
@@ -58,6 +103,18 @@ async function sendCampaignEmails(campaignId, leads, subject, content) {
             sent_at: new Date(),
             email_provider_id: result.messageId,
           });
+
+          // Update lead status to 'proposal' when email is successfully sent
+          await lead.update({
+            status: "proposal",
+            last_contacted: new Date(),
+            last_email_at: new Date(),
+            last_template_id: campaign.template_id,
+          });
+
+          // Update lead email statistics
+          await lead.increment("emails_sent_count");
+
           emailsSent++;
         } else {
           await emailHistory.update({
@@ -96,14 +153,31 @@ async function sendCampaignEmails(campaignId, leads, subject, content) {
   }
 }
 
-// Helper function to personalize content
+// Helper function to personalize content with multiple token formats
 function personalizeContent(content, lead) {
-  return content
-    .replace(/\[name\]/g, lead.name || "")
-    .replace(/\[email\]/g, lead.email || "")
-    .replace(/\[company\]/g, lead.company || "")
-    .replace(/\[phone\]/g, lead.phone || "")
-    .replace(/\[status\]/g, lead.status || "");
+  return (
+    content
+      // Support {{token}} format (recommended)
+      .replace(/\{\{first_name\}\}/g, lead.name ? lead.name.split(" ")[0] : "")
+      .replace(
+        /\{\{last_name\}\}/g,
+        lead.name ? lead.name.split(" ").slice(1).join(" ") : ""
+      )
+      .replace(/\{\{full_name\}\}/g, lead.name || "")
+      .replace(/\{\{name\}\}/g, lead.name || "")
+      .replace(/\{\{email\}\}/g, lead.email || "")
+      .replace(/\{\{company\}\}/g, lead.company || "their company")
+      .replace(/\{\{company_name\}\}/g, lead.company || "their company")
+      .replace(/\{\{phone\}\}/g, lead.phone || "")
+      .replace(/\{\{status\}\}/g, lead.status || "")
+      // Support legacy [token] format for backward compatibility
+      .replace(/\[name\]/g, lead.name || "")
+      .replace(/\[email\]/g, lead.email || "")
+      .replace(/\[company\]/g, lead.company || "their company")
+      .replace(/\[company name\]/g, lead.company || "their company")
+      .replace(/\[phone\]/g, lead.phone || "")
+      .replace(/\[status\]/g, lead.status || "")
+  );
 }
 
 // Validation schemas
@@ -237,17 +311,23 @@ class EmailCampaignController {
   // Create and send bulk email campaign
   async createCampaign(req, res) {
     try {
-      const { error, value } = campaignSchema.validate(req.body);
+      const campaignSchema = Joi.object({
+        name: Joi.string().min(2).max(100).required(),
+        category: Joi.string()
+          .valid("proposal", "follow_up", "introduction")
+          .required(),
+        tone: Joi.string()
+          .valid("professional", "friendly", "formal")
+          .required(),
+        lead_ids: Joi.array().items(Joi.string().uuid()).min(1).required(),
+      });
 
+      const { error } = campaignSchema.validate(req.body);
       if (error) {
-        return res.status(400).json({
-          success: false,
-          error: "Validation failed",
-          details: error.details.map((detail) => detail.message),
-        });
+        return res.status(400).json({ error: error.details[0].message });
       }
 
-      const { lead_ids, ...campaignData } = value;
+      const { name, category, tone, lead_ids } = req.body;
 
       // Verify leads exist
       const leads = await Lead.findAll({
@@ -255,49 +335,33 @@ class EmailCampaignController {
       });
 
       if (leads.length !== lead_ids.length) {
-        return res.status(400).json({
-          success: false,
-          error: "Some leads not found",
-        });
+        return res.status(400).json({ error: "Some leads not found" });
       }
 
-      // Create campaign
+      // Create campaign with automatic subject and content
+      const sampleLead = leads[0];
+      const autoSubject = generateEmailSubject(category, tone, sampleLead);
+      const autoContent = generateEmailContent(category, tone, sampleLead);
+
       const campaign = await EmailCampaign.create({
-        ...campaignData,
+        name,
+        subject: autoSubject,
+        content: autoContent,
         total_recipients: leads.length,
-        status: campaignData.scheduled_at ? "scheduled" : "sending",
+        status: "draft",
       });
 
-      // If not scheduled, send immediately
-      if (!campaignData.scheduled_at) {
-        // Send emails in background
-        setImmediate(async () => {
-          await sendCampaignEmails(
-            campaign.id,
-            leads,
-            campaignData.subject,
-            campaignData.content
-          );
-        });
+      // Send emails in background with category and tone
+      sendCampaignEmails(campaign.id, leads, category, tone);
 
-        res.status(201).json({
-          success: true,
-          message: "Email campaign created and sending started",
-          data: campaign,
-        });
-      } else {
-        res.status(201).json({
-          success: true,
-          message: "Email campaign scheduled successfully",
-          data: campaign,
-        });
-      }
+      res.status(201).json({
+        success: true,
+        campaign: campaign,
+        message: "Campaign created and emails are being sent",
+      });
     } catch (error) {
-      res.status(500).json({
-        success: false,
-        error: "Failed to create email campaign",
-        message: error.message,
-      });
+      console.error("Create campaign error:", error);
+      res.status(500).json({ error: "Failed to create campaign" });
     }
   }
 
@@ -634,12 +698,20 @@ class EmailCampaignController {
       });
 
       // Calculate summary stats
-      const totalSent = await EmailHistory.count({ where: { status: "sent" } });
+      const totalSent = await EmailHistory.count({
+        where: {
+          status: { [Op.in]: ["sent", "opened", "clicked"] },
+        },
+      });
       const totalOpened = await EmailHistory.count({
-        where: { status: "opened" },
+        where: {
+          opened_at: { [Op.not]: null },
+        },
       });
       const totalClicked = await EmailHistory.count({
-        where: { status: "clicked" },
+        where: {
+          clicked_at: { [Op.not]: null },
+        },
       });
       const totalFailed = await EmailHistory.count({
         where: { status: "failed" },

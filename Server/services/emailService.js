@@ -1,5 +1,5 @@
-const nodemailer = require('nodemailer');
-require('dotenv').config();
+const nodemailer = require("nodemailer");
+require("dotenv").config();
 
 class EmailService {
   constructor() {
@@ -11,28 +11,28 @@ class EmailService {
   initializeTransporter() {
     try {
       this.transporter = nodemailer.createTransport({
-        host: process.env.SMTP_HOST || 'smtp.gmail.com',
+        host: process.env.SMTP_HOST || "smtp.gmail.com",
         port: parseInt(process.env.SMTP_PORT) || 587,
-        secure: false, // true for 465, false for other ports
+        secure: false,
         auth: {
           user: process.env.SMTP_USER,
-          pass: process.env.SMTP_PASSWORD
+          pass: process.env.SMTP_PASSWORD,
         },
         tls: {
-          rejectUnauthorized: false
-        }
+          rejectUnauthorized: false,
+        },
       });
 
       // Verify connection configuration
       this.transporter.verify((error, success) => {
         if (error) {
-          console.error('Email service configuration error:', error);
+          console.error("Email service configuration error:", error);
         } else {
-          console.log('✅ Email service is ready to send messages');
+          console.log("✅ Email service is ready to send messages");
         }
       });
     } catch (error) {
-      console.error('Failed to initialize email transporter:', error);
+      console.error("Failed to initialize email transporter:", error);
     }
   }
 
@@ -40,30 +40,30 @@ class EmailService {
   async sendEmail({ to, subject, html, text, from, attachments = [] }) {
     try {
       if (!this.transporter) {
-        throw new Error('Email transporter not initialized');
+        throw new Error("Email transporter not initialized");
       }
 
       const mailOptions = {
-        from: from || process.env.SMTP_USER || 'noreply@leadforge.com',
+        from: from || process.env.SMTP_USER || "mnoumankhalid195@gmail.com",
         to,
         subject,
         html,
-        text: text || html.replace(/<[^>]*>/g, ''), // Strip HTML if no text provided
-        attachments
+        text: text || html.replace(/<[^>]*>/g, ""), // Strip HTML if no text provided
+        attachments,
       };
 
       const result = await this.transporter.sendMail(mailOptions);
-      
+
       return {
         success: true,
         messageId: result.messageId,
-        response: result.response
+        response: result.response,
       };
     } catch (error) {
-      console.error('Email sending error:', error);
+      console.error("Email sending error:", error);
       return {
         success: false,
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -73,7 +73,7 @@ class EmailService {
     const {
       batchSize = 10,
       delayBetweenBatches = 1000, // milliseconds
-      delayBetweenEmails = 100
+      delayBetweenEmails = 100,
     } = options;
 
     const results = [];
@@ -88,7 +88,7 @@ class EmailService {
         batchResults.push({
           ...result,
           recipient: email.to,
-          subject: email.subject
+          subject: email.subject,
         });
 
         // Delay between individual emails
@@ -105,14 +105,14 @@ class EmailService {
       }
     }
 
-    const successful = results.filter(r => r.success).length;
-    const failed = results.filter(r => !r.success).length;
+    const successful = results.filter((r) => r.success).length;
+    const failed = results.filter((r) => !r.success).length;
 
     return {
       total: results.length,
       successful,
       failed,
-      results
+      results,
     };
   }
 
@@ -121,19 +121,25 @@ class EmailService {
     try {
       // This would typically fetch template from database
       // For now, we'll use the provided subject and templateData
-      const html = this.processTemplate(templateData.content || '', templateData);
-      const processedSubject = this.processTemplate(subject || '', templateData);
+      const html = this.processTemplate(
+        templateData.content || "",
+        templateData
+      );
+      const processedSubject = this.processTemplate(
+        subject || "",
+        templateData
+      );
 
       return await this.sendEmail({
         to,
         subject: processedSubject,
         html,
-        from
+        from,
       });
     } catch (error) {
       return {
         success: false,
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -141,10 +147,10 @@ class EmailService {
   // Process template with data (simple placeholder replacement)
   processTemplate(template, data) {
     let processed = template;
-    
-    Object.keys(data).forEach(key => {
-      const placeholder = new RegExp(`\\[${key}\\]`, 'g');
-      processed = processed.replace(placeholder, data[key] || '');
+
+    Object.keys(data).forEach((key) => {
+      const placeholder = new RegExp(`\\[${key}\\]`, "g");
+      processed = processed.replace(placeholder, data[key] || "");
     });
 
     return processed;
@@ -161,25 +167,25 @@ class EmailService {
 
   // Utility function to create delay
   delay(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
   // Test email configuration
   async testConnection() {
     try {
       if (!this.transporter) {
-        throw new Error('Email transporter not initialized');
+        throw new Error("Email transporter not initialized");
       }
 
       await this.transporter.verify();
       return {
         success: true,
-        message: 'Email service connection is working'
+        message: "Email service connection is working",
       };
     } catch (error) {
       return {
         success: false,
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -188,7 +194,7 @@ class EmailService {
   async sendTestEmail(to) {
     const testEmail = {
       to,
-      subject: 'LeadForge Email Service Test',
+      subject: "LeadForge Email Service Test",
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
           <h2 style="color: #1890ff;">LeadForge Email Service Test</h2>
@@ -200,7 +206,7 @@ class EmailService {
             Time: ${new Date().toISOString()}
           </p>
         </div>
-      `
+      `,
     };
 
     return await this.sendEmail(testEmail);
@@ -210,10 +216,10 @@ class EmailService {
   getStatus() {
     return {
       initialized: !!this.transporter,
-      host: process.env.SMTP_HOST || 'Not configured',
-      port: process.env.SMTP_PORT || 'Not configured',
-      user: process.env.SMTP_USER || 'Not configured',
-      secure: process.env.SMTP_PORT === '465'
+      host: process.env.SMTP_HOST || "Not configured",
+      port: process.env.SMTP_PORT || "Not configured",
+      user: process.env.SMTP_USER || "Not configured",
+      secure: process.env.SMTP_PORT === "465",
     };
   }
 }
