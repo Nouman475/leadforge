@@ -38,7 +38,7 @@ const Lead = sequelize.define('Lead', {
     }
   },
   status: {
-    type: DataTypes.ENUM('new', 'contacted', 'qualified', 'proposal', 'closed'),
+    type: DataTypes.ENUM('new', 'contacted', 'qualified', 'proposal', 'closed', 'hot_lead', 'unresponsive', 'contact_failed', 'unsubscribed'),
     defaultValue: 'new',
     allowNull: false
   },
@@ -60,6 +60,43 @@ const Lead = sequelize.define('Lead', {
       min: 0,
       max: 100
     }
+  },
+  emails_sent_count: {
+    type: DataTypes.INTEGER,
+    defaultValue: 0,
+    allowNull: false
+  },
+  emails_failed_count: {
+    type: DataTypes.INTEGER,
+    defaultValue: 0,
+    allowNull: false
+  },
+  emails_opened_count: {
+    type: DataTypes.INTEGER,
+    defaultValue: 0,
+    allowNull: false
+  },
+  emails_clicked_count: {
+    type: DataTypes.INTEGER,
+    defaultValue: 0,
+    allowNull: false
+  },
+  last_email_at: {
+    type: DataTypes.DATE,
+    allowNull: true
+  },
+  last_template_id: {
+    type: DataTypes.UUID,
+    allowNull: true
+  },
+  unsubscribed: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: false,
+    allowNull: false
+  },
+  unsubscribed_at: {
+    type: DataTypes.DATE,
+    allowNull: true
   },
   last_contacted: {
     type: DataTypes.DATE,
@@ -88,4 +125,4 @@ const Lead = sequelize.define('Lead', {
   ]
 });
 
-module.exports = Lead;
+module.exports = { Lead };

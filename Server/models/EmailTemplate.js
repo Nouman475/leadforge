@@ -69,4 +69,4 @@ const EmailTemplate = sequelize.define('EmailTemplate', {
   ]
 });
 
-module.exports = EmailTemplate;
+module.exports = { EmailTemplate };

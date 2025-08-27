@@ -1,8 +1,8 @@
 const { sequelize } = require('../config/database');
-const Lead = require('./Lead');
-const EmailTemplate = require('./EmailTemplate');
-const EmailCampaign = require('./EmailCampaign');
-const EmailHistory = require('./EmailHistory');
+const { Lead } = require('./Lead');
+const { EmailTemplate } = require('./EmailTemplate');
+const { EmailCampaign } = require('./EmailCampaign');
+const { EmailHistory } = require('./EmailHistory');
 
 // Define associations
 EmailCampaign.belongsTo(EmailTemplate, { 

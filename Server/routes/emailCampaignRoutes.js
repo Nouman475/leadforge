@@ -1,6 +1,6 @@
 const express = require('express');
-const emailCampaignController = require('../controllers/emailCampaignController');
 const router = express.Router();
+const emailCampaignController = require('../controllers/emailCampaignController');
 
 // GET /api/email-campaigns - Get all email campaigns with filtering
 router.get('/', emailCampaignController.getAllCampaigns);
