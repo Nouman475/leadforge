@@ -28,6 +28,8 @@ app.use(limiter);
 app.use(cors({
   origin: process.env.CORS_ORIGIN || "http://localhost:3000",
   credentials: true,
+  origin: 'https://leadforge-n.netlify.app',
+  credentials: true
 }));
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
