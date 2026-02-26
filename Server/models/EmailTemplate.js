@@ -1,72 +1,45 @@
-const { DataTypes } = require('sequelize');
-const { sequelize } = require('../config/database');
+const mongoose = require('mongoose');
 
-const EmailTemplate = sequelize.define('EmailTemplate', {
-  id: {
-    type: DataTypes.UUID,
-    defaultValue: DataTypes.UUIDV4,
-    primaryKey: true
-  },
+const emailTemplateSchema = new mongoose.Schema({
   name: {
-    type: DataTypes.STRING,
-    allowNull: false,
-    validate: {
-      notEmpty: true,
-      len: [2, 100]
-    }
-  },
-  category: {
-    type: DataTypes.ENUM('introduction', 'followup', 'proposal', 'meeting', 'thankyou', 'reminder', 'custom'),
-    allowNull: false
-  },
-  tone: {
-    type: DataTypes.ENUM('professional', 'friendly', 'casual', 'formal', 'persuasive'),
-    allowNull: false
+    type: String,
+    required: true,
+    trim: true
   },
   subject: {
-    type: DataTypes.STRING,
-    allowNull: true,
-    validate: {
-      len: [0, 200]
-    }
+    type: String,
+    required: true
   },
   content: {
-    type: DataTypes.TEXT,
-    allowNull: false,
-    validate: {
-      notEmpty: true
-    }
+    type: String,
+    required: true
   },
-  is_active: {
-    type: DataTypes.BOOLEAN,
-    defaultValue: true
+  category: {
+    type: String,
+    enum: ['introduction', 'followup', 'proposal', 'meeting', 'thankyou', 'reminder', 'custom'],
+    default: 'custom'
+  },
+  tone: {
+    type: String,
+    enum: ['professional', 'friendly', 'casual', 'formal', 'persuasive'],
+    default: 'professional'
+  },
+  is_favorite: {
+    type: Boolean,
+    default: false
   },
   usage_count: {
-    type: DataTypes.INTEGER,
-    defaultValue: 0
+    type: Number,
+    default: 0
   },
-  created_at: {
-    type: DataTypes.DATE,
-    defaultValue: DataTypes.NOW
-  },
-  updated_at: {
-    type: DataTypes.DATE,
-    defaultValue: DataTypes.NOW
+  last_used_at: {
+    type: Date
   }
 }, {
-  tableName: 'email_templates',
-  timestamps: false,
-  indexes: [
-    {
-      fields: ['category']
-    },
-    {
-      fields: ['tone']
-    },
-    {
-      fields: ['is_active']
-    }
-  ]
+  timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' }
 });
 
-module.exports = { EmailTemplate };
+emailTemplateSchema.index({ category: 1 });
+emailTemplateSchema.index({ is_favorite: 1 });
+
+module.exports = mongoose.model('EmailTemplate', emailTemplateSchema);

@@ -89,12 +89,13 @@ const BulkEmail = ({ leads, loading }) => {
       key: "select",
       render: (_, record) => (
         <Checkbox
-          checked={selectedLeads.includes(record.id)}
+          checked={selectedLeads.includes(record._id || record.id)}
           onChange={(e) => {
+            const leadId = record._id || record.id;
             if (e.target.checked) {
-              setSelectedLeads([...selectedLeads, record.id]);
+              setSelectedLeads([...selectedLeads, leadId]);
             } else {
-              setSelectedLeads(selectedLeads.filter((id) => id !== record.id));
+              setSelectedLeads(selectedLeads.filter((id) => id !== leadId));
             }
           }}
         />
@@ -132,7 +133,7 @@ const BulkEmail = ({ leads, loading }) => {
 
   const handleSelectAll = (checked) => {
     if (checked) {
-      setSelectedLeads(filteredLeads.map((lead) => lead.id));
+      setSelectedLeads(filteredLeads.map((lead) => lead._id || lead.id));
     } else {
       setSelectedLeads([]);
     }
@@ -185,7 +186,7 @@ const BulkEmail = ({ leads, loading }) => {
     setSendProgress(0);
 
     const selectedLeadData = leads.filter((lead) =>
-      selectedLeads.includes(lead.id)
+      selectedLeads.includes(lead._id || lead.id)
     );
 
     try {
@@ -384,7 +385,7 @@ const BulkEmail = ({ leads, loading }) => {
           <Table
             columns={columns}
             dataSource={filteredLeads}
-            rowKey="id"
+            rowKey={(record) => record._id || record.id}
             pagination={{ pageSize: 10 }}
             size="small"
           />

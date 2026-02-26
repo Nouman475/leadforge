@@ -1,138 +1,80 @@
-const { DataTypes } = require('sequelize');
-const { sequelize } = require('../config/database');
+const mongoose = require('mongoose');
 
-const EmailHistory = sequelize.define('EmailHistory', {
-  id: {
-    type: DataTypes.UUID,
-    defaultValue: DataTypes.UUIDV4,
-    primaryKey: true
-  },
+const emailHistorySchema = new mongoose.Schema({
   campaign_id: {
-    type: DataTypes.UUID,
-    allowNull: true,
-    references: {
-      model: 'email_campaigns',
-      key: 'id'
-    }
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'EmailCampaign',
+    required: true
   },
   lead_id: {
-    type: DataTypes.UUID,
-    allowNull: false,
-    references: {
-      model: 'leads',
-      key: 'id'
-    }
-  },
-  template_id: {
-    type: DataTypes.UUID,
-    allowNull: true,
-    references: {
-      model: 'email_templates',
-      key: 'id'
-    }
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Lead',
+    required: true
   },
   recipient_email: {
-    type: DataTypes.STRING,
-    allowNull: false,
-    validate: {
-      isEmail: true
-    }
+    type: String,
+    required: true
   },
   recipient_name: {
-    type: DataTypes.STRING,
-    allowNull: false
+    type: String
   },
   subject: {
-    type: DataTypes.STRING,
-    allowNull: false
+    type: String,
+    required: true
   },
   content: {
-    type: DataTypes.TEXT,
-    allowNull: false
+    type: String,
+    required: true
   },
   status: {
-    type: DataTypes.ENUM('pending', 'sent', 'failed', 'bounced', 'opened', 'clicked'),
-    defaultValue: 'pending'
+    type: String,
+    enum: ['pending', 'sent', 'failed', 'bounced', 'opened', 'clicked'],
+    default: 'pending'
   },
   sent_at: {
-    type: DataTypes.DATE,
-    allowNull: true
+    type: Date
   },
   opened_at: {
-    type: DataTypes.DATE,
-    allowNull: true
+    type: Date
   },
   clicked_at: {
-    type: DataTypes.DATE,
-    allowNull: true
+    type: Date
+  },
+  bounced_at: {
+    type: Date
   },
   error_message: {
-    type: DataTypes.TEXT,
-    allowNull: true
+    type: String
   },
   email_provider_id: {
-    type: DataTypes.STRING,
-    allowNull: true
-  },
-  retry_count: {
-    type: DataTypes.INTEGER,
-    defaultValue: 0,
-    allowNull: false
+    type: String
   },
   message_uuid: {
-    type: DataTypes.UUID,
-    allowNull: true,
+    type: String,
     unique: true
-  },
-  provider_response: {
-    type: DataTypes.TEXT,
-    allowNull: true
-  },
-  bounce_reason: {
-    type: DataTypes.STRING,
-    allowNull: true
   },
   unsubscribe_token: {
-    type: DataTypes.STRING,
-    allowNull: true,
+    type: String,
     unique: true
   },
-  created_at: {
-    type: DataTypes.DATE,
-    defaultValue: DataTypes.NOW
+  retry_count: {
+    type: Number,
+    default: 0
   },
-  updated_at: {
-    type: DataTypes.DATE,
-    defaultValue: DataTypes.NOW
+  open_count: {
+    type: Number,
+    default: 0
+  },
+  click_count: {
+    type: Number,
+    default: 0
   }
 }, {
-  tableName: 'email_history',
-  indexes: [
-    {
-      fields: ['lead_id']
-    },
-    {
-      fields: ['campaign_id']
-    },
-    {
-      fields: ['status']
-    },
-    {
-      fields: ['sent_at']
-    },
-    {
-      fields: ['recipient_email']
-    },
-    {
-      fields: ['message_uuid']
-    },
-    {
-      fields: ['email_provider_id']
-    },
-    {
-      fields: ['unsubscribe_token']
-    }
-  ]
+  timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' }
 });
 
-module.exports = { EmailHistory };
+emailHistorySchema.index({ campaign_id: 1 });
+emailHistorySchema.index({ lead_id: 1 });
+emailHistorySchema.index({ status: 1 });
+
+module.exports = mongoose.model('EmailHistory', emailHistorySchema);

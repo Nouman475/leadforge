@@ -1,88 +1,53 @@
-const { DataTypes } = require('sequelize');
-const { sequelize } = require('../config/database');
+const mongoose = require('mongoose');
 
-const EmailCampaign = sequelize.define('EmailCampaign', {
-  id: {
-    type: DataTypes.UUID,
-    defaultValue: DataTypes.UUIDV4,
-    primaryKey: true
-  },
+const emailCampaignSchema = new mongoose.Schema({
   name: {
-    type: DataTypes.STRING,
-    allowNull: false,
-    validate: {
-      notEmpty: true,
-      len: [2, 100]
-    }
+    type: String,
+    required: true,
+    trim: true
   },
   subject: {
-    type: DataTypes.STRING,
-    allowNull: false,
-    validate: {
-      notEmpty: true,
-      len: [1, 200]
-    }
+    type: String,
+    required: true
   },
   content: {
-    type: DataTypes.TEXT,
-    allowNull: false,
-    validate: {
-      notEmpty: true
-    }
+    type: String,
+    required: true
   },
   template_id: {
-    type: DataTypes.UUID,
-    allowNull: true,
-    references: {
-      model: 'email_templates',
-      key: 'id'
-    }
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'EmailTemplate'
   },
   status: {
-    type: DataTypes.ENUM('draft', 'scheduled', 'sending', 'completed', 'failed'),
-    defaultValue: 'draft'
+    type: String,
+    enum: ['draft', 'scheduled', 'sending', 'completed', 'failed'],
+    default: 'draft'
   },
   scheduled_at: {
-    type: DataTypes.DATE,
-    allowNull: true
+    type: Date
   },
   sent_at: {
-    type: DataTypes.DATE,
-    allowNull: true
+    type: Date
   },
-  total_recipients: {
-    type: DataTypes.INTEGER,
-    defaultValue: 0
+  completed_at: {
+    type: Date
   },
   emails_sent: {
-    type: DataTypes.INTEGER,
-    defaultValue: 0
+    type: Number,
+    default: 0
   },
   emails_failed: {
-    type: DataTypes.INTEGER,
-    defaultValue: 0
+    type: Number,
+    default: 0
   },
-  created_at: {
-    type: DataTypes.DATE,
-    defaultValue: DataTypes.NOW
-  },
-  updated_at: {
-    type: DataTypes.DATE,
-    defaultValue: DataTypes.NOW
+  error_message: {
+    type: String
   }
 }, {
-  tableName: 'email_campaigns',
-  indexes: [
-    {
-      fields: ['status']
-    },
-    {
-      fields: ['scheduled_at']
-    },
-    {
-      fields: ['created_at']
-    }
-  ]
+  timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' }
 });
 
-module.exports = { EmailCampaign };
+emailCampaignSchema.index({ status: 1 });
+emailCampaignSchema.index({ created_at: -1 });
+
+module.exports = mongoose.model('EmailCampaign', emailCampaignSchema);
