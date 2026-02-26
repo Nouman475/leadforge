@@ -1,32 +1,24 @@
-const { EmailHistory, Lead, EmailTemplate } = require('../models');
-const { v4: uuidv4 } = require('uuid');
+const EmailHistory = require('../models/EmailHistory');
+const Lead = require('../models/Lead');
+const EmailTemplate = require('../models/EmailTemplate');
 
 class WebhookController {
-  // Handle email provider webhooks (opens, clicks, bounces, etc.)
   async handleEmailEvent(req, res) {
     try {
       const { event, data } = req.body;
       
-      // Validate webhook payload
       if (!event || !data) {
         return res.status(400).json({ error: 'Invalid webhook payload' });
       }
 
       console.log(`📧 Webhook received: ${event}`, data);
 
-      // Find email history record by provider ID or message UUID
       let emailHistory = null;
       
       if (data.email_provider_id) {
-        emailHistory = await EmailHistory.findOne({
-          where: { email_provider_id: data.email_provider_id },
-          include: [{ model: Lead, as: 'lead' }]
-        });
+        emailHistory = await EmailHistory.findOne({ email_provider_id: data.email_provider_id }).populate('lead_id');
       } else if (data.message_uuid) {
-        emailHistory = await EmailHistory.findOne({
-          where: { message_uuid: data.message_uuid },
-          include: [{ model: Lead, as: 'lead' }]
-        });
+        emailHistory = await EmailHistory.findOne({ message_uuid: data.message_uuid }).populate('lead_id');
       }
 
       if (!emailHistory) {
@@ -34,7 +26,6 @@ class WebhookController {
         return res.status(404).json({ error: 'Email history not found' });
       }
 
-      // Process different event types
       switch (event) {
         case 'delivered':
           await this.handleDelivered(emailHistory, data);
@@ -63,39 +54,38 @@ class WebhookController {
   }
 
   async handleDelivered(emailHistory, data) {
-    // Update email history
-    await emailHistory.update({
-      status: 'sent',
-      provider_response: JSON.stringify(data)
-    });
+    emailHistory.status = 'sent';
+    emailHistory.provider_response = JSON.stringify(data);
+    await emailHistory.save();
 
-    // Update lead statistics
-    if (emailHistory.lead) {
-      await emailHistory.lead.increment('emails_sent_count');
-      await emailHistory.lead.update({ 
-        last_email_at: new Date(),
-        last_template_id: emailHistory.template_id 
-      });
+    if (emailHistory.lead_id) {
+      const lead = await Lead.findById(emailHistory.lead_id);
+      if (lead) {
+        lead.emails_sent_count = (lead.emails_sent_count || 0) + 1;
+        lead.last_email_at = new Date();
+        lead.last_template_id = emailHistory.template_id;
+        await lead.save();
+      }
     }
 
     console.log(`✅ Email delivered: ${emailHistory.recipient_email}`);
   }
 
   async handleOpened(emailHistory, data) {
-    // Only update if not already opened (first open)
     if (!emailHistory.opened_at) {
-      await emailHistory.update({
-        opened_at: new Date(),
-        status: 'opened',
-        provider_response: JSON.stringify(data)
-      });
+      emailHistory.opened_at = new Date();
+      emailHistory.status = 'opened';
+      emailHistory.provider_response = JSON.stringify(data);
+      await emailHistory.save();
 
-      // Update lead statistics and score
-      if (emailHistory.lead) {
-        await emailHistory.lead.increment(['emails_opened_count', 'lead_score'], { by: [1, 10] });
-        
-        // Apply lead status rules
-        await this.applyLeadStatusRules(emailHistory.lead, 'opened', emailHistory);
+      if (emailHistory.lead_id) {
+        const lead = await Lead.findById(emailHistory.lead_id);
+        if (lead) {
+          lead.emails_opened_count = (lead.emails_opened_count || 0) + 1;
+          lead.score = (lead.score || 0) + 10;
+          await lead.save();
+          await this.applyLeadStatusRules(lead, 'opened', emailHistory);
+        }
       }
 
       console.log(`👀 Email opened: ${emailHistory.recipient_email}`);
@@ -103,20 +93,20 @@ class WebhookController {
   }
 
   async handleClicked(emailHistory, data) {
-    // Only update if not already clicked (first click)
     if (!emailHistory.clicked_at) {
-      await emailHistory.update({
-        clicked_at: new Date(),
-        status: 'clicked',
-        provider_response: JSON.stringify(data)
-      });
+      emailHistory.clicked_at = new Date();
+      emailHistory.status = 'clicked';
+      emailHistory.provider_response = JSON.stringify(data);
+      await emailHistory.save();
 
-      // Update lead statistics and score (higher score for clicks)
-      if (emailHistory.lead) {
-        await emailHistory.lead.increment(['emails_clicked_count', 'lead_score'], { by: [1, 25] });
-        
-        // Apply lead status rules
-        await this.applyLeadStatusRules(emailHistory.lead, 'clicked', emailHistory);
+      if (emailHistory.lead_id) {
+        const lead = await Lead.findById(emailHistory.lead_id);
+        if (lead) {
+          lead.emails_clicked_count = (lead.emails_clicked_count || 0) + 1;
+          lead.score = (lead.score || 0) + 25;
+          await lead.save();
+          await this.applyLeadStatusRules(lead, 'clicked', emailHistory);
+        }
       }
 
       console.log(`🖱️ Email clicked: ${emailHistory.recipient_email}`);
@@ -124,19 +114,19 @@ class WebhookController {
   }
 
   async handleBounced(emailHistory, data) {
-    await emailHistory.update({
-      status: 'bounced',
-      bounce_reason: data.reason || 'Unknown',
-      provider_response: JSON.stringify(data)
-    });
+    emailHistory.status = 'bounced';
+    emailHistory.bounce_reason = data.reason || 'Unknown';
+    emailHistory.provider_response = JSON.stringify(data);
+    await emailHistory.save();
 
-    // Update lead statistics
-    if (emailHistory.lead) {
-      await emailHistory.lead.increment('emails_failed_count');
-      
-      // Mark lead as having contact issues if hard bounce
-      if (data.bounce_type === 'hard') {
-        await emailHistory.lead.update({ status: 'contact_failed' });
+    if (emailHistory.lead_id) {
+      const lead = await Lead.findById(emailHistory.lead_id);
+      if (lead) {
+        lead.emails_failed_count = (lead.emails_failed_count || 0) + 1;
+        if (data.bounce_type === 'hard') {
+          lead.status = 'lost';
+        }
+        await lead.save();
       }
     }
 
@@ -144,57 +134,47 @@ class WebhookController {
   }
 
   async handleUnsubscribed(emailHistory, data) {
-    // Mark lead as unsubscribed
-    if (emailHistory.lead) {
-      await emailHistory.lead.update({
-        unsubscribed: true,
-        unsubscribed_at: new Date(),
-        status: 'unsubscribed'
-      });
+    if (emailHistory.lead_id) {
+      const lead = await Lead.findById(emailHistory.lead_id);
+      if (lead) {
+        lead.unsubscribed = true;
+        lead.unsubscribed_at = new Date();
+        lead.status = 'lost';
+        await lead.save();
+      }
     }
 
     console.log(`🚫 Lead unsubscribed: ${emailHistory.recipient_email}`);
   }
 
-  // Lead status update rules based on email interactions
   async applyLeadStatusRules(lead, eventType, emailHistory) {
     try {
-      // Get template to check category
-      const template = await EmailTemplate.findByPk(emailHistory.template_id);
+      const template = await EmailTemplate.findById(emailHistory.template_id);
       
-      // Rule 1: If template is proposal, update lead status
       if (template && template.category === 'proposal') {
-        await lead.update({ 
-          status: 'proposal',
-          last_contacted: new Date()
-        });
+        lead.status = 'proposal';
+        lead.last_contacted = new Date();
       }
 
-      // Rule 2: If lead score reaches threshold, mark as qualified
-      await lead.reload(); // Refresh to get updated score
-      if (lead.lead_score >= 70 && lead.status !== 'qualified') {
-        await lead.update({ status: 'qualified' });
+      if (lead.score >= 70 && lead.status !== 'qualified') {
+        lead.status = 'qualified';
       }
 
-      // Rule 3: If many emails sent but no engagement, mark as unresponsive
-      if (lead.emails_sent_count >= 5 && lead.emails_opened_count === 0) {
-        await lead.update({ status: 'unresponsive' });
+      if ((lead.emails_sent_count || 0) >= 5 && (lead.emails_opened_count || 0) === 0) {
+        lead.status = 'lost';
       }
 
-      // Rule 4: If clicked on multiple emails, mark as hot lead
-      if (lead.emails_clicked_count >= 2 && lead.status !== 'qualified') {
-        await lead.update({ 
-          status: 'hot_lead',
-          lead_score: Math.max(lead.lead_score, 80)
-        });
+      if ((lead.emails_clicked_count || 0) >= 2 && lead.status !== 'qualified') {
+        lead.status = 'qualified';
+        lead.score = Math.max(lead.score || 0, 80);
       }
 
+      await lead.save();
     } catch (error) {
       console.error('Error applying lead status rules:', error);
     }
   }
 
-  // Handle unsubscribe requests
   async handleUnsubscribe(req, res) {
     try {
       const { token } = req.params;
@@ -203,22 +183,19 @@ class WebhookController {
         return res.status(400).json({ error: 'Unsubscribe token required' });
       }
 
-      // Find email history by unsubscribe token
-      const emailHistory = await EmailHistory.findOne({
-        where: { unsubscribe_token: token },
-        include: [{ model: Lead, as: 'lead' }]
-      });
+      const emailHistory = await EmailHistory.findOne({ unsubscribe_token: token }).populate('lead_id');
 
-      if (!emailHistory || !emailHistory.lead) {
+      if (!emailHistory || !emailHistory.lead_id) {
         return res.status(404).json({ error: 'Invalid unsubscribe token' });
       }
 
-      // Mark lead as unsubscribed
-      await emailHistory.lead.update({
-        unsubscribed: true,
-        unsubscribed_at: new Date(),
-        status: 'unsubscribed'
-      });
+      const lead = await Lead.findById(emailHistory.lead_id);
+      if (lead) {
+        lead.unsubscribed = true;
+        lead.unsubscribed_at = new Date();
+        lead.status = 'lost';
+        await lead.save();
+      }
 
       res.status(200).json({
         success: true,

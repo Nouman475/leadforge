@@ -1,128 +1,74 @@
-const { DataTypes } = require('sequelize');
-const { sequelize } = require('../config/database');
+const mongoose = require('mongoose');
 
-const Lead = sequelize.define('Lead', {
-  id: {
-    type: DataTypes.UUID,
-    defaultValue: DataTypes.UUIDV4,
-    primaryKey: true
-  },
+const leadSchema = new mongoose.Schema({
   name: {
-    type: DataTypes.STRING,
-    allowNull: false,
-    validate: {
-      notEmpty: true,
-      len: [2, 100]
-    }
+    type: String,
+    required: true,
+    trim: true
   },
   email: {
-    type: DataTypes.STRING,
-    allowNull: false,
+    type: String,
+    required: true,
     unique: true,
-    validate: {
-      isEmail: true
-    }
+    lowercase: true,
+    trim: true
   },
   phone: {
-    type: DataTypes.STRING,
-    allowNull: true,
-    validate: {
-      len: [10, 20]
-    }
+    type: String,
+    trim: true
   },
   company: {
-    type: DataTypes.STRING,
-    allowNull: true,
-    validate: {
-      len: [0, 100]
-    }
+    type: String,
+    trim: true
   },
   status: {
-    type: DataTypes.ENUM('new', 'contacted', 'qualified', 'proposal', 'closed', 'hot_lead', 'unresponsive', 'contact_failed', 'unsubscribed'),
-    defaultValue: 'new',
-    allowNull: false
-  },
-  notes: {
-    type: DataTypes.TEXT,
-    allowNull: true
+    type: String,
+    enum: ['new', 'contacted', 'qualified', 'proposal', 'closed', 'lost'],
+    default: 'new'
   },
   source: {
-    type: DataTypes.STRING,
-    allowNull: true,
-    validate: {
-      len: [0, 50]
-    }
+    type: String,
+    trim: true
   },
-  lead_score: {
-    type: DataTypes.INTEGER,
-    defaultValue: 0,
-    validate: {
-      min: 0,
-      max: 100
-    }
+  notes: {
+    type: String
   },
-  emails_sent_count: {
-    type: DataTypes.INTEGER,
-    defaultValue: 0,
-    allowNull: false
-  },
-  emails_failed_count: {
-    type: DataTypes.INTEGER,
-    defaultValue: 0,
-    allowNull: false
-  },
-  emails_opened_count: {
-    type: DataTypes.INTEGER,
-    defaultValue: 0,
-    allowNull: false
-  },
-  emails_clicked_count: {
-    type: DataTypes.INTEGER,
-    defaultValue: 0,
-    allowNull: false
-  },
-  last_email_at: {
-    type: DataTypes.DATE,
-    allowNull: true
-  },
-  last_template_id: {
-    type: DataTypes.UUID,
-    allowNull: true
-  },
-  unsubscribed: {
-    type: DataTypes.BOOLEAN,
-    defaultValue: false,
-    allowNull: false
-  },
-  unsubscribed_at: {
-    type: DataTypes.DATE,
-    allowNull: true
+  score: {
+    type: Number,
+    default: 0,
+    min: 0,
+    max: 100
   },
   last_contacted: {
-    type: DataTypes.DATE,
-    allowNull: true
+    type: Date
   },
-  created_at: {
-    type: DataTypes.DATE,
-    defaultValue: DataTypes.NOW
+  last_email_at: {
+    type: Date
   },
-  updated_at: {
-    type: DataTypes.DATE,
-    defaultValue: DataTypes.NOW
+  last_template_id: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'EmailTemplate'
+  },
+  emails_sent_count: {
+    type: Number,
+    default: 0
+  },
+  emails_opened_count: {
+    type: Number,
+    default: 0
+  },
+  emails_clicked_count: {
+    type: Number,
+    default: 0
+  },
+  conversion_date: {
+    type: Date
   }
 }, {
-  tableName: 'leads',
-  indexes: [
-    {
-      fields: ['email']
-    },
-    {
-      fields: ['status']
-    },
-    {
-      fields: ['created_at']
-    }
-  ]
+  timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' }
 });
 
-module.exports = { Lead };
+leadSchema.index({ status: 1 });
+leadSchema.index({ created_at: -1 });
+
+module.exports = mongoose.model('Lead', leadSchema);
